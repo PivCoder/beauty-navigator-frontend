@@ -1,6 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { LogOut, User } from "lucide-react"
-import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { getMe, getMyProfile, updateProfile } from "@/api/auth"
 import { listAllergens, removeAllergen } from "@/api/profile"
@@ -8,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "@/lib/toast"
 import { useAuthStore } from "@/store/auth"
 
 const COLOR_LABEL: Record<string, string> = {
@@ -23,12 +23,10 @@ export default function ProfilePage() {
   const { data: profile, isLoading } = useQuery({ queryKey: ["profile"], queryFn: getMyProfile })
   const { data: allergens = [], refetch } = useQuery({ queryKey: ["allergens"], queryFn: listAllergens })
 
-  const [allergenError, setAllergenError] = useState("")
-
   const removeAllergenMutation = useMutation({
     mutationFn: (id: string) => removeAllergen(id),
-    onSuccess: () => { refetch(); setAllergenError("") },
-    onError: () => setAllergenError("Не удалось удалить аллерген"),
+    onSuccess: () => { refetch(); toast.success("Аллерген удалён") },
+    onError: () => toast.error("Не удалось удалить аллерген"),
   })
 
   const resetOnboarding = useMutation({
@@ -100,7 +98,6 @@ export default function ProfilePage() {
                     </Badge>
                   ))}
                 </div>
-                {allergenError && <p className="text-sm text-destructive">{allergenError}</p>}
               </CardContent>
             </Card>
           )}

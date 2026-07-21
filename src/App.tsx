@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import AppLayout from "@/components/layout/AppLayout"
 import ProtectedRoute from "@/components/layout/ProtectedRoute"
+import { Toaster } from "@/components/ui/toaster"
 import AuthPage from "@/pages/AuthPage"
 import BagPage from "@/pages/BagPage"
 import BagsListPage from "@/pages/BagsListPage"
@@ -17,6 +18,7 @@ const qc = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={qc}>
+      <Toaster />
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<AuthPage />} />

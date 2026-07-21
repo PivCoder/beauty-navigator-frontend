@@ -72,12 +72,15 @@ export interface CatalogProductBrief {
   brand: string | null
 }
 
+export type PaoStatus = "unknown" | "fresh" | "expiring" | "expired"
+
 export interface UserProductItemRead {
   id: string
   catalog_id: string
   catalog_product: CatalogProductBrief | null
   opened_at: string | null
   expires_at: string | null
+  pao_status: PaoStatus
   created_at: string
 }
 

@@ -20,8 +20,14 @@ export async function deleteBag(bagId: string): Promise<void> {
   await api.delete(`/inventory/bags/${bagId}`)
 }
 
-export async function createItem(catalog_id: string): Promise<UserProductItemRead> {
-  const { data } = await api.post<UserProductItemRead>("/inventory/items", { catalog_id })
+export async function createItem(
+  catalog_id: string,
+  opened_at?: string,
+): Promise<UserProductItemRead> {
+  const { data } = await api.post<UserProductItemRead>("/inventory/items", {
+    catalog_id,
+    ...(opened_at ? { opened_at } : {}),
+  })
   return data
 }
 

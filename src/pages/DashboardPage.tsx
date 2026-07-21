@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "@/lib/toast"
 
 const CONTEXT_LABELS: Record<string, string> = {
   home: "Дом",
@@ -23,7 +24,6 @@ export default function DashboardPage() {
   const [open, setOpen] = useState(false)
   const [bagName, setBagName] = useState("")
   const [bagContext, setBagContext] = useState("")
-  const [createError, setCreateError] = useState("")
 
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: getMyProfile })
   const { data: bags = [], isLoading } = useQuery({ queryKey: ["bags"], queryFn: listBags })
@@ -34,10 +34,10 @@ export default function DashboardPage() {
       qc.invalidateQueries({ queryKey: ["bags"] })
       setBagName("")
       setBagContext("")
-      setCreateError("")
       setOpen(false)
+      toast.success("Косметичка создана")
     },
-    onError: () => setCreateError("Не удалось создать косметичку"),
+    onError: () => toast.error("Не удалось создать косметичку"),
   })
 
   return (
@@ -94,7 +94,6 @@ export default function DashboardPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {createError && <p className="text-sm text-destructive">{createError}</p>}
                 <Button
                   className="w-full"
                   disabled={!bagName.trim() || createMutation.isPending}

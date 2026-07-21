@@ -5,6 +5,7 @@ import { getMyProfile, updateProfile } from "@/api/auth"
 import { listActives } from "@/api/catalog"
 import { addAllergen, listAllergens, removeAllergen } from "@/api/profile"
 import { updateSkinZones } from "@/api/skin"
+import { toast } from "@/lib/toast"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -208,8 +209,9 @@ export default function OnboardingPage() {
                     try {
                       await removeAllergen(a.active_id)
                       refetchAllergens()
+                      toast.success("Аллерген удалён")
                     } catch {
-                      setError("Не удалось удалить аллерген")
+                      toast.error("Не удалось удалить аллерген")
                     }
                   }}
                 >
@@ -232,8 +234,9 @@ export default function OnboardingPage() {
                     await addAllergen(a.id)
                     refetchAllergens()
                     setSearch("")
+                    toast.success(`Аллерген добавлен: ${a.name ?? a.code}`)
                   } catch {
-                    setError("Не удалось добавить аллерген")
+                    toast.error("Не удалось добавить аллерген")
                   }
                 }}
               >

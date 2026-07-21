@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "@/lib/toast"
 import type { GenerationRequestRead } from "@/types"
 
 function StatusBadge({ status }: { status: string }) {
@@ -48,7 +49,6 @@ export default function GeneratePage() {
   const [templateId, setTemplateId] = useState("")
   const [activeRequest, setActiveRequest] = useState<GenerationRequestRead | null>(null)
   const [polling, setPolling] = useState(false)
-  const [genError, setGenError] = useState("")
 
   const { data: bags = [], isLoading: bagsLoading } = useQuery({ queryKey: ["bags"], queryFn: listBags })
   const { data: templates = [], isLoading: tplLoading } = useQuery({ queryKey: ["templates"], queryFn: listTemplates })
@@ -56,8 +56,8 @@ export default function GeneratePage() {
   const generateMutation = useMutation({
     mutationFn: ({ force }: { force?: boolean } = {}) =>
       requestGeneration(bagId, templateId, force),
-    onSuccess: (req) => { setActiveRequest(req); setGenError("") },
-    onError: () => setGenError("Не удалось отправить запрос на генерацию"),
+    onSuccess: (req) => setActiveRequest(req),
+    onError: () => toast.error("Не удалось отправить запрос на генерацию"),
   })
 
   // cancelled ref prevents stale interval callback from updating state after cleanup
@@ -146,7 +146,6 @@ export default function GeneratePage() {
           )}
         </Button>
 
-        {genError && <p className="text-sm text-destructive">{genError}</p>}
       </div>
 
       {activeRequest && (

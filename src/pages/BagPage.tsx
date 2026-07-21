@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import type { ProductType } from "@/types"
+import { toast } from "@/lib/toast"
+import type { PaoStatus, ProductType } from "@/types"
 
 const PRODUCT_TYPE_LABELS: Record<string, string> = {
   skincare_active: "Уход",
@@ -26,15 +28,29 @@ const CONTEXT_LABELS: Record<string, string> = {
   travel: "Путешествие",
 }
 
+const PAO_CONFIG: Record<PaoStatus, { label: string; className: string } | null> = {
+  expired: { label: "Просрочен", className: "bg-destructive/10 text-destructive border-destructive/20" },
+  expiring: { label: "Истекает", className: "bg-orange-50 text-orange-600 border-orange-200" },
+  fresh: null,
+  unknown: null,
+}
+
+function getApiDetail(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "response" in err) {
+    const detail = (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail
+    if (typeof detail === "string") return detail
+  }
+  return fallback
+}
+
 export default function BagPage() {
   const { bagId } = useParams<{ bagId: string }>()
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [brand, setBrand] = useState("")
   const [productType, setProductType] = useState<ProductType | "">("")
+  const [openedAt, setOpenedAt] = useState("")
   const [searching, setSearching] = useState(false)
-  const [addError, setAddError] = useState("")
-  const [removeError, setRemoveError] = useState("")
   const [removingItemId, setRemovingItemId] = useState<string | null>(null)
 
   const { data: bag, isLoading } = useQuery({
@@ -45,7 +61,8 @@ export default function BagPage() {
 
   const { data: products = [], refetch: searchProducts } = useQuery({
     queryKey: ["catalog", brand, productType],
-    queryFn: () => listProducts({ brand: brand || undefined, product_type: productType || undefined, limit: 30 }),
+    queryFn: () =>
+      listProducts({ brand: brand || undefined, product_type: productType || undefined, limit: 30 }),
     enabled: false,
   })
 
@@ -57,7 +74,7 @@ export default function BagPage() {
 
   const addMutation = useMutation({
     mutationFn: async (catalogId: string) => {
-      const item = await createItem(catalogId)
+      const item = await createItem(catalogId, openedAt || undefined)
       try {
         await addItemToBag(bagId!, item.id)
       } catch (err) {
@@ -67,10 +84,12 @@ export default function BagPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["bag", bagId] })
-      setAddError("")
       setOpen(false)
+      toast.success("Продукт добавлен")
     },
-    onError: () => setAddError("Не удалось добавить продукт"),
+    onError: (err) => {
+      toast.error(getApiDetail(err, "Не удалось добавить продукт"))
+    },
   })
 
   const removeMutation = useMutation({
@@ -79,10 +98,19 @@ export default function BagPage() {
     onSettled: () => setRemovingItemId(null),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["bag", bagId] })
-      setRemoveError("")
+      toast.success("Продукт удалён")
     },
-    onError: () => setRemoveError("Не удалось удалить продукт"),
+    onError: () => toast.error("Не удалось удалить продукт"),
   })
+
+  function handleOpenChange(v: boolean) {
+    setOpen(v)
+    if (!v) {
+      setBrand("")
+      setProductType("")
+      setOpenedAt("")
+    }
+  }
 
   if (isLoading) {
     return (
@@ -113,7 +141,7 @@ export default function BagPage() {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{bag.items.length} продуктов</p>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setAddError("") }}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1">
               <Plus className="h-4 w-4" /> Добавить
@@ -124,13 +152,11 @@ export default function BagPage() {
               <DialogTitle>Добавить продукт</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 pt-2">
-              <div className="space-y-1.5">
-                <Input
-                  placeholder="Бренд (например: MAC, NARS)"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                />
-              </div>
+              <Input
+                placeholder="Бренд (например: MAC, NARS)"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+              />
               <Select value={productType} onValueChange={(v) => setProductType(v as ProductType)}>
                 <SelectTrigger><SelectValue placeholder="Тип продукта" /></SelectTrigger>
                 <SelectContent>
@@ -139,44 +165,61 @@ export default function BagPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" className="w-full gap-2" onClick={handleSearch} disabled={searching}>
+              <Button
+                variant="outline"
+                className="w-full gap-2"
+                onClick={handleSearch}
+                disabled={searching}
+              >
                 <Search className="h-4 w-4" />
                 {searching ? "Поиск..." : "Найти"}
               </Button>
 
-              <div className="max-h-64 overflow-y-auto space-y-2">
-                {products.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.brand ?? "—"}</p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={catalogIds.has(p.id) ? "secondary" : "default"}
-                      disabled={catalogIds.has(p.id) || addMutation.isPending}
-                      onClick={() => addMutation.mutate(p.id)}
-                    >
-                      {catalogIds.has(p.id) ? "Есть" : "Добавить"}
-                    </Button>
-                  </div>
-                ))}
-                {products.length === 0 && (
+              <div className="max-h-56 overflow-y-auto space-y-2">
+                {products.length === 0 ? (
                   <p className="text-center text-sm text-muted-foreground py-6">
-                    Нажмите «Найти» для поиска
+                    {searching ? "Поиск..." : "Нажмите «Найти» для поиска"}
                   </p>
+                ) : (
+                  products.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.brand ?? "—"}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={catalogIds.has(p.id) ? "secondary" : "default"}
+                        disabled={catalogIds.has(p.id) || addMutation.isPending}
+                        onClick={() => addMutation.mutate(p.id)}
+                      >
+                        {catalogIds.has(p.id) ? "Есть" : "Добавить"}
+                      </Button>
+                    </div>
+                  ))
                 )}
               </div>
-              {addError && <p className="text-sm text-destructive">{addError}</p>}
+
+              {products.length > 0 && (
+                <div className="space-y-1.5 border-t pt-3">
+                  <Label className="text-xs text-muted-foreground">
+                    Дата вскрытия (для расчёта срока годности)
+                  </Label>
+                  <Input
+                    type="date"
+                    value={openedAt}
+                    onChange={(e) => setOpenedAt(e.target.value)}
+                    max={new Date().toISOString().split("T")[0]}
+                  />
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
       </div>
-
-      {removeError && <p className="text-sm text-destructive">{removeError}</p>}
 
       {bag.items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
@@ -185,33 +228,47 @@ export default function BagPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {bag.items.map((bi) => (
-            <Card key={bi.id}>
-              <CardContent className="flex items-center justify-between p-4">
-                <div>
-                  <p className="text-sm font-medium">
-                    {bi.item.catalog_product?.name ?? bi.item.catalog_id.slice(0, 8) + "…"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {bi.item.catalog_product?.brand
-                      ? bi.item.catalog_product.brand
-                      : bi.item.opened_at
-                        ? `Открыт: ${bi.item.opened_at}`
-                        : "Не открыт"}
-                  </p>
-                </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => removeMutation.mutate(bi.id)}
-                  disabled={removingItemId === bi.id}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+          {bag.items.map((bi) => {
+            const paoCfg = PAO_CONFIG[bi.item.pao_status]
+            return (
+              <Card key={bi.id} className={paoCfg ? "border-orange-200" : ""}>
+                <CardContent className="flex items-center justify-between p-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium">
+                        {bi.item.catalog_product?.name ?? bi.item.catalog_id.slice(0, 8) + "…"}
+                      </p>
+                      {paoCfg && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${paoCfg.className}`}>
+                          {paoCfg.label}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {bi.item.catalog_product?.brand && (
+                        <span>{bi.item.catalog_product.brand}</span>
+                      )}
+                      {bi.item.opened_at && (
+                        <span className={bi.item.catalog_product?.brand ? " · " : ""}>
+                          Открыт: {bi.item.opened_at}
+                        </span>
+                      )}
+                      {!bi.item.catalog_product?.brand && !bi.item.opened_at && "Не открыт"}
+                    </p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive shrink-0 ml-2"
+                    onClick={() => removeMutation.mutate(bi.id)}
+                    disabled={removingItemId === bi.id}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
     </div>
