@@ -32,3 +32,7 @@ export async function addItemToBag(bagId: string, item_id: string): Promise<void
 export async function removeItemFromBag(bagId: string, bagItemId: string): Promise<void> {
   await api.delete(`/inventory/bags/${bagId}/items/${bagItemId}`)
 }
+
+export async function deleteItem(itemId: string): Promise<void> {
+  await api.delete(`/inventory/items/${itemId}`)
+}

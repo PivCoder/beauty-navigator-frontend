@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { Sparkles, AlertCircle, CheckCircle2, Loader2, RefreshCw } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { listBags } from "@/api/inventory"
 import { listTemplates } from "@/api/templates"
 import { getGenerationRequest, requestGeneration } from "@/api/generation"
@@ -48,6 +48,7 @@ export default function GeneratePage() {
   const [templateId, setTemplateId] = useState("")
   const [activeRequest, setActiveRequest] = useState<GenerationRequestRead | null>(null)
   const [polling, setPolling] = useState(false)
+  const [genError, setGenError] = useState("")
 
   const { data: bags = [], isLoading: bagsLoading } = useQuery({ queryKey: ["bags"], queryFn: listBags })
   const { data: templates = [], isLoading: tplLoading } = useQuery({ queryKey: ["templates"], queryFn: listTemplates })
@@ -55,33 +56,47 @@ export default function GeneratePage() {
   const generateMutation = useMutation({
     mutationFn: ({ force }: { force?: boolean } = {}) =>
       requestGeneration(bagId, templateId, force),
-    onSuccess: (req) => setActiveRequest(req),
+    onSuccess: (req) => { setActiveRequest(req); setGenError("") },
+    onError: () => setGenError("Не удалось отправить запрос на генерацию"),
   })
 
-  // Poll while pending/processing
+  // cancelled ref prevents stale interval callback from updating state after cleanup
+  const cancelledRef = useRef(false)
+
   useEffect(() => {
     if (!activeRequest || activeRequest.status === "done" || activeRequest.status === "failed") {
       setPolling(false)
       return
     }
+
+    cancelledRef.current = false
     setPolling(true)
+
     const timer = setInterval(async () => {
+      if (cancelledRef.current) return
       try {
         const updated = await getGenerationRequest(activeRequest.id)
+        if (cancelledRef.current) return
         setActiveRequest(updated)
         if (updated.status === "done" || updated.status === "failed") {
           setPolling(false)
           clearInterval(timer)
         }
       } catch {
-        clearInterval(timer)
-        setPolling(false)
+        if (!cancelledRef.current) {
+          clearInterval(timer)
+          setPolling(false)
+        }
       }
     }, 3000)
-    return () => clearInterval(timer)
+
+    return () => {
+      cancelledRef.current = true
+      clearInterval(timer)
+    }
   }, [activeRequest?.id, activeRequest?.status])
 
-  const canGenerate = bagId && templateId && !generateMutation.isPending
+  const canGenerate = bagId && templateId && !generateMutation.isPending && !polling
 
   return (
     <div className="p-4 space-y-6">
@@ -130,6 +145,8 @@ export default function GeneratePage() {
             <><Sparkles className="h-4 w-4" /> Сгенерировать</>
           )}
         </Button>
+
+        {genError && <p className="text-sm text-destructive">{genError}</p>}
       </div>
 
       {activeRequest && (
@@ -147,7 +164,7 @@ export default function GeneratePage() {
                 variant="outline"
                 className="gap-1"
                 onClick={() => generateMutation.mutate({ force: true })}
-                disabled={generateMutation.isPending}
+                disabled={generateMutation.isPending || !canGenerate}
               >
                 <RefreshCw className="h-3.5 w-3.5" /> Пересоздать
               </Button>

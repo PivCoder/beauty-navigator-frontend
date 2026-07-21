@@ -3,7 +3,7 @@ import { ArrowLeft, Plus, Trash2, Search } from "lucide-react"
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { listProducts } from "@/api/catalog"
-import { addItemToBag, createItem, getBag, removeItemFromBag } from "@/api/inventory"
+import { addItemToBag, createItem, deleteItem, getBag, removeItemFromBag } from "@/api/inventory"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -20,6 +20,12 @@ const PRODUCT_TYPE_LABELS: Record<string, string> = {
   cleanser: "Очищение",
 }
 
+const CONTEXT_LABELS: Record<string, string> = {
+  home: "Дом",
+  work: "Работа",
+  travel: "Путешествие",
+}
+
 export default function BagPage() {
   const { bagId } = useParams<{ bagId: string }>()
   const qc = useQueryClient()
@@ -27,6 +33,9 @@ export default function BagPage() {
   const [brand, setBrand] = useState("")
   const [productType, setProductType] = useState<ProductType | "">("")
   const [searching, setSearching] = useState(false)
+  const [addError, setAddError] = useState("")
+  const [removeError, setRemoveError] = useState("")
+  const [removingItemId, setRemovingItemId] = useState<string | null>(null)
 
   const { data: bag, isLoading } = useQuery({
     queryKey: ["bag", bagId],
@@ -49,17 +58,30 @@ export default function BagPage() {
   const addMutation = useMutation({
     mutationFn: async (catalogId: string) => {
       const item = await createItem(catalogId)
-      await addItemToBag(bagId!, item.id)
+      try {
+        await addItemToBag(bagId!, item.id)
+      } catch (err) {
+        await deleteItem(item.id).catch(() => {})
+        throw err
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["bag", bagId] })
+      setAddError("")
       setOpen(false)
     },
+    onError: () => setAddError("Не удалось добавить продукт"),
   })
 
   const removeMutation = useMutation({
     mutationFn: (bagItemId: string) => removeItemFromBag(bagId!, bagItemId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["bag", bagId] }),
+    onMutate: (bagItemId) => setRemovingItemId(bagItemId),
+    onSettled: () => setRemovingItemId(null),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bag", bagId] })
+      setRemoveError("")
+    },
+    onError: () => setRemoveError("Не удалось удалить продукт"),
   })
 
   if (isLoading) {
@@ -78,20 +100,20 @@ export default function BagPage() {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center gap-3 pt-2">
-        <Link to="/" className="text-muted-foreground hover:text-foreground">
+        <Link to="/bags" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <h1 className="text-xl font-semibold">{bag.name}</h1>
         {bag.context && (
           <Badge variant="secondary" className="ml-auto">
-            {bag.context}
+            {CONTEXT_LABELS[bag.context] ?? bag.context}
           </Badge>
         )}
       </div>
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{bag.items.length} продуктов</p>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setAddError("") }}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1">
               <Plus className="h-4 w-4" /> Добавить
@@ -148,10 +170,13 @@ export default function BagPage() {
                   </p>
                 )}
               </div>
+              {addError && <p className="text-sm text-destructive">{addError}</p>}
             </div>
           </DialogContent>
         </Dialog>
       </div>
+
+      {removeError && <p className="text-sm text-destructive">{removeError}</p>}
 
       {bag.items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
@@ -164,9 +189,15 @@ export default function BagPage() {
             <Card key={bi.id}>
               <CardContent className="flex items-center justify-between p-4">
                 <div>
-                  <p className="text-sm font-medium">{bi.item.catalog_id.slice(0, 8)}…</p>
+                  <p className="text-sm font-medium">
+                    {bi.item.catalog_product?.name ?? bi.item.catalog_id.slice(0, 8) + "…"}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    {bi.item.opened_at ? `Открыт: ${bi.item.opened_at}` : "Не открыт"}
+                    {bi.item.catalog_product?.brand
+                      ? bi.item.catalog_product.brand
+                      : bi.item.opened_at
+                        ? `Открыт: ${bi.item.opened_at}`
+                        : "Не открыт"}
                   </p>
                 </div>
                 <Button
@@ -174,7 +205,7 @@ export default function BagPage() {
                   variant="ghost"
                   className="text-destructive hover:text-destructive"
                   onClick={() => removeMutation.mutate(bi.id)}
-                  disabled={removeMutation.isPending}
+                  disabled={removingItemId === bi.id}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

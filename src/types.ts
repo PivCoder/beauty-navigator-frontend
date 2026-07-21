@@ -67,9 +67,15 @@ export interface BagRead {
   created_at: string
 }
 
+export interface CatalogProductBrief {
+  name: string
+  brand: string | null
+}
+
 export interface UserProductItemRead {
   id: string
   catalog_id: string
+  catalog_product: CatalogProductBrief | null
   opened_at: string | null
   expires_at: string | null
   created_at: string

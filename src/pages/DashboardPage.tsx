@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [open, setOpen] = useState(false)
   const [bagName, setBagName] = useState("")
   const [bagContext, setBagContext] = useState("")
+  const [createError, setCreateError] = useState("")
 
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: getMyProfile })
   const { data: bags = [], isLoading } = useQuery({ queryKey: ["bags"], queryFn: listBags })
@@ -33,8 +34,10 @@ export default function DashboardPage() {
       qc.invalidateQueries({ queryKey: ["bags"] })
       setBagName("")
       setBagContext("")
+      setCreateError("")
       setOpen(false)
     },
+    onError: () => setCreateError("Не удалось создать косметичку"),
   })
 
   return (
@@ -91,6 +94,7 @@ export default function DashboardPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {createError && <p className="text-sm text-destructive">{createError}</p>}
                 <Button
                   className="w-full"
                   disabled={!bagName.trim() || createMutation.isPending}

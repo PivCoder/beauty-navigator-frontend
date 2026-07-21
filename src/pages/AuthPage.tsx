@@ -10,23 +10,25 @@ import { useAuthStore } from "@/store/auth"
 export default function AuthPage() {
   const setToken = useAuthStore((s) => s.setToken)
   const navigate = useNavigate()
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [loginError, setLoginError] = useState("")
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [registerError, setRegisterError] = useState("")
+  const [registerLoading, setRegisterLoading] = useState(false)
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
-    setError("")
-    setLoading(true)
+    setLoginError("")
+    setLoginLoading(true)
     try {
       const token = await login(fd.get("email") as string, fd.get("password") as string)
       setToken(token)
       const profile = await getMyProfile()
       navigate(profile.onboarding_done ? "/" : "/onboarding", { replace: true })
     } catch {
-      setError("Неверный email или пароль")
+      setLoginError("Неверный email или пароль")
     } finally {
-      setLoading(false)
+      setLoginLoading(false)
     }
   }
 
@@ -37,21 +39,27 @@ export default function AuthPage() {
     const password = fd.get("password") as string
     const confirm = fd.get("confirm") as string
     if (password !== confirm) {
-      setError("Пароли не совпадают")
+      setRegisterError("Пароли не совпадают")
       return
     }
-    setError("")
-    setLoading(true)
+    setRegisterError("")
+    setRegisterLoading(true)
+    let registered = false
     try {
       await register(email, password)
+      registered = true
       const token = await login(email, password)
       setToken(token)
       navigate("/onboarding", { replace: true })
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(typeof msg === "string" ? msg : "Ошибка регистрации")
+      if (!registered) {
+        const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        setRegisterError(typeof msg === "string" ? msg : "Ошибка регистрации")
+      } else {
+        setRegisterError("Аккаунт создан — войдите через форму входа")
+      }
     } finally {
-      setLoading(false)
+      setRegisterLoading(false)
     }
   }
 
@@ -64,7 +72,7 @@ export default function AuthPage() {
       </div>
 
       <div className="w-full max-w-sm">
-        <Tabs defaultValue="login" onValueChange={() => setError("")}>
+        <Tabs defaultValue="login" onValueChange={() => { setLoginError(""); setRegisterError("") }}>
           <TabsList className="w-full mb-6">
             <TabsTrigger value="login" className="flex-1">Войти</TabsTrigger>
             <TabsTrigger value="register" className="flex-1">Регистрация</TabsTrigger>
@@ -80,9 +88,9 @@ export default function AuthPage() {
                 <Label htmlFor="login-password">Пароль</Label>
                 <Input id="login-password" name="password" type="password" required placeholder="••••••••" />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Вход..." : "Войти"}
+              {loginError && <p className="text-sm text-destructive">{loginError}</p>}
+              <Button type="submit" className="w-full" disabled={loginLoading}>
+                {loginLoading ? "Вход..." : "Войти"}
               </Button>
             </form>
           </TabsContent>
@@ -101,9 +109,9 @@ export default function AuthPage() {
                 <Label htmlFor="reg-confirm">Повторите пароль</Label>
                 <Input id="reg-confirm" name="confirm" type="password" required placeholder="••••••••" />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Регистрация..." : "Создать аккаунт"}
+              {registerError && <p className="text-sm text-destructive">{registerError}</p>}
+              <Button type="submit" className="w-full" disabled={registerLoading}>
+                {registerLoading ? "Регистрация..." : "Создать аккаунт"}
               </Button>
             </form>
           </TabsContent>

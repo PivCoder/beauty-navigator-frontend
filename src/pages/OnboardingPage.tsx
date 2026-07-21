@@ -204,7 +204,14 @@ export default function OnboardingPage() {
                   key={a.active_id}
                   variant="secondary"
                   className="cursor-pointer gap-1"
-                  onClick={async () => { await removeAllergen(a.active_id); refetchAllergens() }}
+                  onClick={async () => {
+                    try {
+                      await removeAllergen(a.active_id)
+                      refetchAllergens()
+                    } catch {
+                      setError("Не удалось удалить аллерген")
+                    }
+                  }}
                 >
                   {a.name ?? a.code} <span className="opacity-50">×</span>
                 </Badge>
@@ -220,7 +227,15 @@ export default function OnboardingPage() {
                 key={a.id}
                 type="button"
                 className="w-full text-left px-3 py-2 rounded-md hover:bg-accent text-sm transition-colors"
-                onClick={async () => { await addAllergen(a.id); refetchAllergens(); setSearch("") }}
+                onClick={async () => {
+                  try {
+                    await addAllergen(a.id)
+                    refetchAllergens()
+                    setSearch("")
+                  } catch {
+                    setError("Не удалось добавить аллерген")
+                  }
+                }}
               >
                 <span className="font-medium">{a.name ?? a.code}</span>
                 {a.name && <span className="text-muted-foreground ml-2 text-xs">{a.code}</span>}

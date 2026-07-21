@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { LogOut, User } from "lucide-react"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { getMe, getMyProfile, updateProfile } from "@/api/auth"
 import { listAllergens, removeAllergen } from "@/api/profile"
@@ -22,9 +23,12 @@ export default function ProfilePage() {
   const { data: profile, isLoading } = useQuery({ queryKey: ["profile"], queryFn: getMyProfile })
   const { data: allergens = [], refetch } = useQuery({ queryKey: ["allergens"], queryFn: listAllergens })
 
+  const [allergenError, setAllergenError] = useState("")
+
   const removeAllergenMutation = useMutation({
     mutationFn: (id: string) => removeAllergen(id),
-    onSuccess: () => refetch(),
+    onSuccess: () => { refetch(); setAllergenError("") },
+    onError: () => setAllergenError("Не удалось удалить аллерген"),
   })
 
   const resetOnboarding = useMutation({
@@ -83,7 +87,7 @@ export default function ProfilePage() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Аллергены</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   {allergens.map((a) => (
                     <Badge
@@ -96,6 +100,7 @@ export default function ProfilePage() {
                     </Badge>
                   ))}
                 </div>
+                {allergenError && <p className="text-sm text-destructive">{allergenError}</p>}
               </CardContent>
             </Card>
           )}
