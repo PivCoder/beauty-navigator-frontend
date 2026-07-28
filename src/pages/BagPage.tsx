@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import { listProducts } from "@/api/catalog"
 import { addItemToBag, createItem, deleteItem, getBag, removeItemFromBag } from "@/api/inventory"
-import { Badge } from "@/components/ui/badge"
+import { Badge, type BadgeProps } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -28,11 +28,11 @@ const CONTEXT_LABELS: Record<string, string> = {
   travel: "Путешествие",
 }
 
-const PAO_CONFIG: Record<PaoStatus, { label: string; className: string } | null> = {
-  expired: { label: "Просрочен", className: "bg-destructive/10 text-destructive border-destructive/20" },
-  expiring: { label: "Истекает", className: "bg-orange-50 text-orange-600 border-orange-200" },
-  fresh: null,
-  unknown: null,
+const PAO_CONFIG: Record<PaoStatus, { label: string; variant: NonNullable<BadgeProps["variant"]>; cardBorder: string }> = {
+  unknown: { label: "Срок не указан", variant: "secondary", cardBorder: "" },
+  fresh: { label: "Годен", variant: "success", cardBorder: "" },
+  expiring: { label: "Истекает", variant: "warning", cardBorder: "border-yellow-200" },
+  expired: { label: "Просрочен", variant: "destructive", cardBorder: "border-destructive/30" },
 }
 
 function getApiDetail(err: unknown, fallback: string): string {
@@ -231,18 +231,16 @@ export default function BagPage() {
           {bag.items.map((bi) => {
             const paoCfg = PAO_CONFIG[bi.item.pao_status]
             return (
-              <Card key={bi.id} className={paoCfg ? "border-orange-200" : ""}>
+              <Card key={bi.id} className={paoCfg.cardBorder}>
                 <CardContent className="flex items-center justify-between p-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium">
                         {bi.item.catalog_product?.name ?? bi.item.catalog_id.slice(0, 8) + "…"}
                       </p>
-                      {paoCfg && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${paoCfg.className}`}>
-                          {paoCfg.label}
-                        </span>
-                      )}
+                      <Badge variant={paoCfg.variant} className="font-medium">
+                        {paoCfg.label}
+                      </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {bi.item.catalog_product?.brand && (
