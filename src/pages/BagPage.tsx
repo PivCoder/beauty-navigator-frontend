@@ -28,9 +28,13 @@ const CONTEXT_LABELS: Record<string, string> = {
   travel: "Путешествие",
 }
 
+// The badge is present on every card regardless of status; a uniformly bright
+// badge on each one would just read as noise, so the four statuses split by
+// visual weight instead: muted/neutral for 'unknown' and 'fresh', accent
+// colour for the two that call for action — 'expiring' and 'expired'.
 const PAO_CONFIG: Record<PaoStatus, { label: string; variant: NonNullable<BadgeProps["variant"]>; cardBorder: string }> = {
   unknown: { label: "Срок не указан", variant: "secondary", cardBorder: "" },
-  fresh: { label: "Годен", variant: "success", cardBorder: "" },
+  fresh: { label: "Годен", variant: "secondary", cardBorder: "" },
   expiring: { label: "Истекает", variant: "warning", cardBorder: "border-yellow-200" },
   expired: { label: "Просрочен", variant: "destructive", cardBorder: "border-destructive/30" },
 }
